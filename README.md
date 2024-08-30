@@ -26,17 +26,6 @@ pip install -e .
 
 ## Usage
 
-#### Download sample image
-
-```bash
-# Download sample image
-wget -O img-1.jpg https://github.com/MetythornPenn/autocrop/blob/main/sample/img-1.jpg
-
-# Download model from here
-wget -O autocrop_model_mbv3.pth https://github.com/MetythornPenn/autocrop/blob/main/models/autocrop_model_mbv3.pth
-
-```
-
 #### Python API
 
 ```python
