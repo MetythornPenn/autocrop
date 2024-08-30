@@ -92,5 +92,14 @@ plt.show()
 - `device`: Specify `cpu` or `cuda` (default is `gpu`).
 - `output_path`: Path where the extracted document image will be saved.
 
+#### Result:
+
+<p align="center">
+  <img src="sample/img-1.jpg" alt="Left Image" width="45%">
+  <img src="extracted_document.jpg" alt="Right Image" width="45%">
+</p>
+
+
+
 ## Reference 
 - Inspired by [DeepLabV3](https://paperswithcode.com/method/deeplabv3)
