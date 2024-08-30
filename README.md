@@ -33,7 +33,7 @@ pip install -e .
 wget -O img-1.jpg https://github.com/MetythornPenn/autocrop/blob/main/sample/img-1.jpg
 
 # Download model
-wget -O autocrop_model_mb3.pth https://github.com/MetythornPenn/autocrop/blob/main/models/autocrop_model_mbv3.pth
+wget -O autocrop_model_mbv3.pth https://github.com/MetythornPenn/autocrop/blob/main/models/autocrop_model_mbv3.pth
 
 ```
 
