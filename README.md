@@ -8,11 +8,6 @@ License: [Apache-2.0 License](https://github.com/MetythornPenn/sdab/blob/main/LI
 
 ## Installation
 
-#### Install from PyPI
-```sh
-pip install autocrop
-```
-
 #### Install from source
 
 ```sh
