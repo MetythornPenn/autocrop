@@ -30,10 +30,10 @@ pip install -e .
 
 ```bash
 # Download sample image
-wget -O img-1.jpg https://github.com/metythornpenn/autocrop/sample/img-1.jpg
+wget -O img-1.jpg https://github.com/MetythornPenn/autocrop/blob/main/sample/img-1.jpg
 
 # Download model
-wget -O autocrop_model_mb3.pth https://github.com/metythornpenn/autocrop/model/autocrop_model.mbv3.pth
+wget -O autocrop_model_mb3.pth https://github.com/MetythornPenn/autocrop/blob/main/models/autocrop_model_mbv3.pth
 
 ```
 
