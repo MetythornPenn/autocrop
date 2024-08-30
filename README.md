@@ -32,7 +32,7 @@ pip install -e .
 # Download sample image
 wget -O img-1.jpg https://github.com/MetythornPenn/autocrop/blob/main/sample/img-1.jpg
 
-# Download model
+# Download model from here
 wget -O autocrop_model_mbv3.pth https://github.com/MetythornPenn/autocrop/blob/main/models/autocrop_model_mbv3.pth
 
 ```
@@ -42,30 +42,48 @@ wget -O autocrop_model_mbv3.pth https://github.com/MetythornPenn/autocrop/blob/m
 ```python
 import torch
 import cv2
-from autocrop import autocrop 
+import requests
 
-# Define paths
+from autocrop import autocrop
+
+# Function to download files using requests
+def download_file(url, output_path):
+    response = requests.get(url)
+    response.raise_for_status()  # Check for HTTP errors
+    with open(output_path, 'wb') as file:
+        file.write(response.content)
+
+# URLs for the image and model
+img_url = "https://github.com/MetythornPenn/autocrop/raw/main/sample/img-1.jpg"
+model_url = "https://github.com/MetythornPenn/autocrop/raw/main/models/autocrop_model_mbv3.pth"
+
+# Local paths to save the files
 img_path = "img-1.jpg"
-output_path = "extracted_document.jpg"
 model_path = "autocrop_model_mbv3.pth"
 
-# Select the device (CPU or CUDA)
+# Download the image and model files
+download_file(img_url, img_path)
+download_file(model_url, model_path)
+
+# Specify device (CPU or CUDA)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Perform document extraction
 extracted_document = autocrop(img_path, model_path, device)
 
 # Save the extracted document
+output_path = "extracted_document.jpg"
 cv2.imwrite(output_path, extracted_document[:, :, ::-1])  # Convert back to BGR for saving
 
 print(f"Extracted document saved to {output_path}")
 
 # Display the result (Optional)
-# import matplotlib.pyplot as plt
-# plt.figure(figsize=(10, 5))
-# plt.imshow(extracted_document / 255.0)
-# plt.title("Extracted Document")
-# plt.show()
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 5))
+plt.imshow(extracted_document / 255.0)
+plt.title("Extracted Document")
+plt.show()
+
 
 ```
 
