@@ -34,24 +34,30 @@ import cv2
 from autocrop_kh import autocrop
 
 # Download sample image from this url : "https://github.com/MetythornPenn/autocrop_kh/raw/main/sample/img-1.jpg"
-# Download model from this url: "https://github.com/MetythornPenn/autocrop_kh/raw/main/models/autocrop_model_v2.onnx"
+# Model auto-download (default):
+# The ONNX model is downloaded on first run from Hugging Face:
+# "https://huggingface.co/metythorn/autocrop/resolve/main/autocrop_model_v2.onnx"
+
+img_path = "sample/img-1.jpg"
+model_path = None
 
 extracted_document = autocrop(
     img_path=img_path,
-    model_path=model_path, 
-    device='cuda:0'
+    model_path=model_path,
+    device='cuda:0',
+    output_path="extracted_document.jpg"
 )
 
-output_path = "extracted_document.jpg"
-cv2.imwrite(output_path, extracted_document[:, :, ::-1])  # Convert back to BGR for saving
-print(f"Extracted document saved to {output_path}")
+print("Extracted document saved to extracted_document.jpg")
 
 ```
 
 - `img_path`: Path of the input image file.
-- `model_path`: Path to the pre-trained model (local path and support both .onnx and .pth).
-- `device`: Specify `cpu` or `cuda` or `mps` (default is `gpu`).
-- `output_path`: Path where the extracted document image will be saved.
+- `model_path`: Path to the pre-trained ONNX model (local path, `.onnx` only). If `None`, it auto-downloads from Hugging Face.
+- `device`: Specify `cpu` or `cuda` (default is `cpu`).
+- `output_path`: Optional. If set, saves the extracted image to this path.
+- `AUTOCROP_KH_MODEL_DIR`: Optional env var to change the download/cache directory.
+- `AUTOCROP_KH_HF_REPO`: Optional env var to change the Hugging Face repo (default `metythorn/autocrop`).
 
 #### Result:
 

@@ -2,15 +2,19 @@ import os
 import gc
 import cv2
 import numpy as np
-import torch
-import torchvision.transforms as torchvision_T
-from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large
 import onnxruntime as ort
 import warnings
+from urllib import request as urlrequest
+from urllib.error import URLError, HTTPError
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 # Suppress ONNX Runtime warnings by setting environment variables
 os.environ["ORT_LOGGING_LEVEL"] = "3"  # Set to 3 to suppress warnings and only show errors
+
+DEFAULT_MODEL_FILENAME = "autocrop_model_v2.onnx"
+DEFAULT_HF_REPO = "metythorn/autocrop"
+ENV_MODEL_DIR = "AUTOCROP_KH_MODEL_DIR"
+ENV_HF_REPO = "AUTOCROP_KH_HF_REPO"
 
 
 def order_points(pts):
@@ -36,30 +40,69 @@ def find_dest(pts):
     return order_points(destination_corners)
 
 def image_preproces_transforms(mean=(0.4611, 0.4359, 0.3905), std=(0.2193, 0.2150, 0.2109)):
-    common_transforms = torchvision_T.Compose(
-        [torchvision_T.ToTensor(), torchvision_T.Normalize(mean, std)]
-    )
-    return common_transforms
+    mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
+    std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
+
+    def _transform(image):
+        image = image.astype(np.float32) / 255.0
+        image = (image - mean) / std
+        return np.transpose(image, (2, 0, 1))
+
+    return _transform
+
+def _default_model_dir():
+    env_dir = os.environ.get(ENV_MODEL_DIR)
+    if env_dir:
+        return env_dir
+    return os.path.join(os.path.expanduser("~"), ".cache", "autocrop_kh")
+
+def _hf_model_url(filename):
+    repo = os.environ.get(ENV_HF_REPO, DEFAULT_HF_REPO)
+    return f"https://huggingface.co/{repo}/resolve/main/{filename}"
+
+def _download_model(url, dest_path):
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    tmp_path = dest_path + ".download"
+    try:
+        with urlrequest.urlopen(url) as response, open(tmp_path, "wb") as f:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+        os.replace(tmp_path, dest_path)
+    except (HTTPError, URLError) as exc:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise RuntimeError(f"Failed to download model from {url}: {exc}") from exc
+
+def ensure_model_path(model_path):
+    if model_path is None:
+        model_path = os.path.join(_default_model_dir(), DEFAULT_MODEL_FILENAME)
+
+    if not model_path.endswith(".onnx"):
+        raise ValueError("Unsupported model format. Only .onnx is supported.")
+
+    if not os.path.exists(model_path):
+        url = _hf_model_url(os.path.basename(model_path))
+        _download_model(url, model_path)
+
+    return model_path
 
 def load_autocrop_model(checkpoint_path, device):
-    if checkpoint_path.endswith('.pth'):
-        num_classes = 2
-        model = deeplabv3_mobilenet_v3_large(num_classes=num_classes)
-        model.to(device)
-        checkpoints = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(checkpoints, strict=False)
-        model.eval()
-        return model, 'torch'
-    elif checkpoint_path.endswith('.onnx'):
-        # Load the ONNX model
-        session = ort.InferenceSession(checkpoint_path, providers=['CUDAExecutionProvider' if device == 'cuda' else 'CPUExecutionProvider'])
-        return session, 'onnx'
-    else:
-        raise ValueError("Unsupported model format. Supported formats are .pth and .onnx")
+    checkpoint_path = ensure_model_path(checkpoint_path)
+
+    providers = ort.get_available_providers()
+    use_cuda = (device == 'cuda') and ('CUDAExecutionProvider' in providers)
+    session = ort.InferenceSession(
+        checkpoint_path,
+        providers=['CUDAExecutionProvider' if use_cuda else 'CPUExecutionProvider'],
+    )
+    return session
 
 preprocess_transforms = image_preproces_transforms()
 
-def extract(image_true=None, trained_model=None, image_size=384, BUFFER=10, device=None, model_type='torch'):
+def extract(image_true=None, trained_model=None, image_size=384, BUFFER=10):
     IMAGE_SIZE = image_size
     half = IMAGE_SIZE // 2
 
@@ -69,22 +112,15 @@ def extract(image_true=None, trained_model=None, image_size=384, BUFFER=10, devi
     scale_y = imH / IMAGE_SIZE
 
     image_model = preprocess_transforms(image_model)
-    image_model = torch.unsqueeze(image_model, dim=0)
-
-    if model_type == 'torch':
-        image_model = image_model.to(device)
-        with torch.no_grad():
-            out = trained_model(image_model)["out"].cpu()
-    elif model_type == 'onnx':
-        image_model = image_model.numpy()  # Convert tensor to numpy for ONNX
-        input_name = trained_model.get_inputs()[0].name
-        output = trained_model.run(None, {input_name: image_model})
-        out = torch.tensor(output[0])
+    image_model = np.expand_dims(image_model, axis=0)
+    input_name = trained_model.get_inputs()[0].name
+    output = trained_model.run(None, {input_name: image_model})
+    out = output[0]
 
     del image_model
     gc.collect()
 
-    out = torch.argmax(out, dim=1, keepdims=True).permute(0, 2, 3, 1)[0].numpy().squeeze().astype(np.int32)
+    out = np.argmax(out, axis=1, keepdims=True).transpose(0, 2, 3, 1)[0].squeeze().astype(np.int32)
     r_H, r_W = out.shape
 
     _out_extended = np.zeros((IMAGE_SIZE + r_H, IMAGE_SIZE + r_W), dtype=out.dtype)
@@ -152,9 +188,9 @@ def extract(image_true=None, trained_model=None, image_size=384, BUFFER=10, devi
 
     return final
 
-def autocrop(img_path=None, np_image=None, pil_image=None, model_path=None, device=None):
-    # Load the model and determine type (torch or onnx)
-    trained_model, model_type = load_autocrop_model(checkpoint_path=model_path, device=device)
+def autocrop(img_path=None, np_image=None, pil_image=None, model_path=None, device=None, trained_model=None, output_path=None):
+    if trained_model is None:
+        trained_model = load_autocrop_model(checkpoint_path=model_path, device=device)
 
     if img_path:
         # If img_path is provided, read the image from disk
@@ -169,7 +205,9 @@ def autocrop(img_path=None, np_image=None, pil_image=None, model_path=None, devi
         raise ValueError("No image input provided. Please provide img_path, np_image, or pil_image.")
 
     # Perform document extraction
-    extracted_image = extract(image_true=image, trained_model=trained_model, device=device, model_type=model_type)
+    extracted_image = extract(image_true=image, trained_model=trained_model)
+
+    if output_path:
+        cv2.imwrite(output_path, extracted_image[:, :, ::-1])
 
     return extracted_image
-

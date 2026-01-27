@@ -6,17 +6,15 @@ def read(*paths):
         return f.read()
     
 requirements = [
-    'torch',
-    'torchvision',
     'numpy',
     'opencv-python-headless',
-    'onnx'
+    'onnxruntime'
     # 'matplotlib'
 ]
 
 setup(
     name='autocrop_kh',
-    version='0.0.3',
+    version='1.1',
     packages=['autocrop_kh'],
     url='https://github.com/MetythornPenn/autocrop_kh.git',
     license='Apache Software License 2.0',
